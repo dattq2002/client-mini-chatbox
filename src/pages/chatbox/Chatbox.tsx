@@ -212,7 +212,6 @@ export default function Chatbox() {
   const handleSelectUser = async (user: any) => {
     if (!socket || !currentUserId) return
 
-    // Reset typing state khi chuyển user
     setIsTyping(false)
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
@@ -223,7 +222,6 @@ export default function Chatbox() {
     console.log('Joining room:', roomId)
 
     try {
-      // Gọi API lấy tin nhắn cũ - sửa lại phần này
       const response = await GetAllMessage({
         senderId: currentUserId,
         receiverId: user.id
@@ -231,33 +229,29 @@ export default function Chatbox() {
 
       console.log('API Response:', response.data)
 
-      if (response.data && response.data.users && Array.isArray(response.data.users)) {
-        // Chuyển đổi dữ liệu tin nhắn từ API sang format hiển thị
-        const formattedMessages = response.data.users
-          .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-          .map((msg: any) => ({
-            id: msg._id,
-            sender: msg.senderId === currentUserId ? 'Bạn' : user.name,
-            senderId: msg.senderId,
-            time: new Date(msg.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit'
-            }),
-            text: msg.content
-          }))
+      const messages = response.data?.users && Array.isArray(response.data.users) ? response.data.users : []
 
-        console.log('Formatted Messages:', formattedMessages)
-        setMessages(formattedMessages)
-      } else {
-        console.log('No messages found or invalid response format')
-        setMessages([])
-      }
+      const formattedMessages = messages
+        .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        .map((msg: any) => ({
+          id: msg._id,
+          sender: msg.senderId === currentUserId ? 'Bạn' : user.name,
+          senderId: msg.senderId,
+          time: new Date(msg.createdAt).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          text: msg.content,
+          timestamp: msg.timestamp // Lưu timestamp để sắp xếp sau
+        }))
+
+      console.log('Formatted Messages:', formattedMessages)
+      setMessages(formattedMessages)
     } catch (error) {
       console.error('Error loading messages:', error)
       setMessages([])
     }
 
-    // Join phòng chat
     socket.emit('joinRoom', { roomId, userId: currentUserId })
     setSelectedUser(user)
   }
@@ -394,7 +388,7 @@ export default function Chatbox() {
                   {isTyping ? 'Đang nhập tin nhắn...' : selectedUser.online ? 'Online' : 'Offline'}
                 </div>
               </div>
-              <div className='ml-auto text-xs text-gray-500'>Room: {currentRoom}</div>
+              {/* <div className='ml-auto text-xs text-gray-500'>Room: {currentRoom}</div> */}
             </div>
 
             {/* Messages */}
