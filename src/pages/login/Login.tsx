@@ -23,14 +23,16 @@ export default function Login() {
     loginAccountMutation.mutate(body, {
       onSuccess: (data) => {
         console.log('data', data.data)
-        const res = data.data.data
+        const res = data.data.result
         if (res) {
           localStorage.setItem('access_token', res.access_token)
           localStorage.setItem('refresh_token', res.refresh_token)
+          console.log('access_token', res.access_token)
+          console.log('refresh_token', res.refresh_token)
         } else {
           console.error('Response data is undefined')
         }
-        navigate('/')
+        navigate('/chatbox')
       },
       onError: (error) => {
         console.log('error', error)

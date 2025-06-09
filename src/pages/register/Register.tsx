@@ -17,7 +17,6 @@ export default function Register() {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors }
   } = useForm<FormData>({
     resolver: yupResolver(registerSchema)
@@ -29,22 +28,20 @@ export default function Register() {
     registerAccountMutation.mutate(data, {
       onSuccess: (data) => {
         console.log('data', data)
-        const res = data.data.data
+        const res = data.data.result
         if (res) {
           localStorage.setItem('access_token', res.access_token)
           localStorage.setItem('refresh_token', res.refresh_token)
         } else {
           console.error('Response data is undefined')
         }
-        navigate('/login')
+        navigate('/chatbox')
       },
       onError: (error) => {
         console.log('error', error)
       }
     })
   })
-  const values = watch()
-  console.log('values', values)
   return (
     <div className='min-h-screen flex items-center justify-center bg-white min-w-[375px] '>
       <div className='bg-white px-8 pb-8 rounded-lg w-full max-w-md'>
