@@ -8,7 +8,8 @@ class Http {
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json'
+        Accept: 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`
       }
     })
   }

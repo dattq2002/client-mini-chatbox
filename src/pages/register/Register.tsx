@@ -32,6 +32,8 @@ export default function Register() {
         if (res) {
           localStorage.setItem('access_token', res.access_token)
           localStorage.setItem('refresh_token', res.refresh_token)
+          localStorage.setItem('user_id', res.user_id)
+          localStorage.setItem('username', res.name)
         } else {
           console.error('Response data is undefined')
         }

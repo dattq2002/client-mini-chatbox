@@ -27,8 +27,11 @@ export default function Login() {
         if (res) {
           localStorage.setItem('access_token', res.access_token)
           localStorage.setItem('refresh_token', res.refresh_token)
+          localStorage.setItem('user_id', res.user_id)
+          localStorage.setItem('username', res.name)
           console.log('access_token', res.access_token)
           console.log('refresh_token', res.refresh_token)
+          console.log('user_id', res.user_id)
         } else {
           console.error('Response data is undefined')
         }
