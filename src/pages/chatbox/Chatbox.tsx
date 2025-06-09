@@ -223,7 +223,7 @@ export default function Chatbox() {
     console.log('Joining room:', roomId)
 
     try {
-      // Gọi API lấy tin nhắn cũ
+      // Gọi API lấy tin nhắn cũ - sửa lại phần này
       const response = await GetAllMessage({
         senderId: currentUserId,
         receiverId: user.id
@@ -231,7 +231,7 @@ export default function Chatbox() {
 
       console.log('API Response:', response.data)
 
-      if (response.data.users && Array.isArray(response.data.users)) {
+      if (response.data && response.data.users && Array.isArray(response.data.users)) {
         // Chuyển đổi dữ liệu tin nhắn từ API sang format hiển thị
         const formattedMessages = response.data.users
           .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -249,6 +249,7 @@ export default function Chatbox() {
         console.log('Formatted Messages:', formattedMessages)
         setMessages(formattedMessages)
       } else {
+        console.log('No messages found or invalid response format')
         setMessages([])
       }
     } catch (error) {
@@ -398,19 +399,30 @@ export default function Chatbox() {
 
             {/* Messages */}
             <div className='flex-1 overflow-y-auto p-4 space-y-4'>
-              {messages.map((msg) => (
-                <div key={`${msg.id}-${msg.time}`}>
-                  <div className='text-center text-xs text-gray-500 mb-2'>{msg.time}</div>
-                  <div
-                    className={`p-3 rounded-lg whitespace-pre-wrap max-w-[70%] ${
-                      msg.senderId === currentUserId ? 'bg-blue-600 ml-auto' : 'bg-[#333]'
-                    }`}
-                  >
-                    <strong>{msg.sender}</strong>
-                    <p className='text-sm mt-1'>{msg.text}</p>
-                  </div>
+              {messages.length === 0 ? (
+                <div className='flex items-center justify-center h-full text-gray-400'>
+                  Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện!
                 </div>
-              ))}
+              ) : (
+                messages.map((msg, index) => (
+                  <div
+                    key={`${msg.id}-${index}`}
+                    className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[70%] ${msg.senderId === currentUserId ? 'order-2' : 'order-1'}`}>
+                      <div className='text-center text-xs text-gray-500 mb-1'>{msg.time}</div>
+                      <div
+                        className={`p-3 rounded-lg whitespace-pre-wrap ${
+                          msg.senderId === currentUserId ? 'bg-blue-600 text-white' : 'bg-[#333] text-white'
+                        }`}
+                      >
+                        <div className='text-xs text-gray-300 mb-1'>{msg.sender}</div>
+                        <p className='text-sm'>{msg.text}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
               <div ref={messagesEndRef} />
             </div>
 
