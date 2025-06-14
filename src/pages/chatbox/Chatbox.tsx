@@ -25,7 +25,8 @@ export default function Chatbox() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const currentUserId = localStorage.getItem('user_id')
-  const currentUsername = localStorage.getItem('username')
+  // const currentUsername = localStorage.getItem('username')
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
 
   // Tự động cuộn xuống tin nhắn mới nhất
   const scrollToBottom = () => {
@@ -72,7 +73,9 @@ export default function Chatbox() {
   // Xử lý socket events
   useEffect(() => {
     if (!socket || !currentUserId) return
-
+    socket.on('updateOnlineUsers', (onlineIds: string[]) => {
+      setOnlineUserIds(onlineIds)
+    })
     // Lắng nghe tin nhắn mới
     const handleReceiveMessage = (message: any) => {
       console.log('Received new message:', message)
@@ -282,7 +285,7 @@ export default function Chatbox() {
         name: user.username,
         message: 'Bấm để bắt đầu trò chuyện',
         time: 'now',
-        online: true,
+        online: onlineUserIds.includes(user._id),
         avatar: `https://i.pravatar.cc/50?u=${user._id}`
       }))
       setUsers(mappedUsers)
@@ -306,7 +309,7 @@ export default function Chatbox() {
           name: user.username,
           message: 'Bấm để bắt đầu trò chuyện',
           time: 'now',
-          online: true,
+          online: onlineUserIds.includes(user._id),
           avatar: `https://i.pravatar.cc/50?u=${user._id}`
         }))
         setUsers(mappedUsers)
@@ -318,7 +321,7 @@ export default function Chatbox() {
     if (currentUserId) {
       fetchUsers()
     }
-  }, [currentUserId])
+  }, [currentUserId, onlineUserIds])
 
   // Cleanup khi component unmount
   useEffect(() => {
@@ -361,9 +364,12 @@ export default function Chatbox() {
             >
               <div className='relative'>
                 <img src={user.avatar} alt={user.name} className='w-10 h-10 rounded-full' />
-                {user.online && (
-                  <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#1E1E1E] rounded-full'></span>
-                )}
+                <span
+                  className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-[#1E1E1E] rounded-full ${
+                    user.online ? 'bg-green-500' : 'bg-gray-500'
+                  }`}
+                  title={user.online ? 'Online' : 'Offline'}
+                ></span>
               </div>
               <div className='flex-1'>
                 <div className='font-semibold truncate'>{user.name}</div>
