@@ -494,12 +494,12 @@ export default function Chatbox() {
 
   return (
     <div className='h-screen w-screen flex text-white font-sans'>
-      <div className='w-[320px] bg-[#1E1E1E] p-4 flex flex-col'>
+      <div className='w-[320px] bg-white p-4 flex flex-col'>
         <div className='flex justify-between items-center mb-4'>
-          <h1 className='text-2xl font-bold'>Chats</h1>
+          <h1 className='text-2xl font-bold text-black'>Chats</h1>
           <div className='flex items-center gap-2'>
             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className='text-xs'>{isConnected ? 'Online' : 'Offline'}</span>
+            <span className='text-xs text-black'>{isConnected ? 'Online' : 'Offline'}</span>
             <button className='text-sm bg-red-600 hover:bg-red-700 px-3 py-1 rounded' onClick={handleLogout}>
               Đăng xuất
             </button>
@@ -510,15 +510,15 @@ export default function Chatbox() {
           value={search}
           onChange={handleSearch}
           placeholder='Search Messenger'
-          className='p-2 mb-4 rounded-md bg-[#3A3A3A] text-white outline-none'
+          className='p-2 mb-4 rounded-md text-black outline-none border border-gray-800 bg-white'
         />
         <div className='flex-1 overflow-y-auto space-y-2'>
           {users.map((user) => (
             <div
               key={user.id}
               onClick={() => handleSelectUser(user)}
-              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-[#333] ${
-                selectedUser?.id === user.id ? 'bg-[#333]' : ''
+              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer text-black ${
+                selectedUser?.id === user.id ? 'bg-gray-300 border border-blue-500' : ''
               }`}
             >
               <div className='relative'>
@@ -540,14 +540,14 @@ export default function Chatbox() {
         </div>
       </div>
 
-      <div className='flex-1 bg-[#101010] flex flex-col'>
+      <div className='flex-1 bg-[#ecebeb] flex flex-col border-l border-[#333]'>
         {selectedUser ? (
           <>
             <div className='flex items-center gap-3 px-4 py-2 border-b border-[#333]'>
               <img src={selectedUser.avatar} alt={selectedUser.name} className='w-10 h-10 rounded-full' />
               <div>
-                <div className='font-semibold'>{selectedUser.name}</div>
-                <div className='text-sm text-gray-400'>
+                <div className='font-semibold text-black'>{selectedUser.name}</div>
+                <div className='text-sm text-black'>
                   {isTyping ? 'Đang nhập tin nhắn...' : selectedUser.online ? 'Online' : 'Offline'}
                 </div>
               </div>
@@ -568,13 +568,14 @@ export default function Chatbox() {
                       <div className='text-center text-xs text-gray-500 mb-1'>{msg.time}</div>
                       <div
                         className={`p-3 rounded-lg whitespace-pre-wrap ${
-                          msg.senderId === currentUserId ? 'bg-blue-600 text-white' : 'bg-[#333] text-white'
+                          msg.senderId === currentUserId ? ' text-black border border-black' : 'bg-[#333] text-white'
                         }`}
                       >
-                        <div className='text-xs text-gray-300 mb-1'>{msg.sender}</div>
+                        <div className='text-xs text-black mb-1'>{msg.sender}</div>
                         {msg.messageType === 'voice' && msg.audioUrl ? (
-                          <audio controls className='w-full'>
+                          <audio controls className='w-full rounded-md'>
                             <source src={`http://localhost:4000${msg.audioUrl}`} type='audio/webm' />
+                            Trình duyệt của bạn không hỗ trợ audio.
                           </audio>
                         ) : (
                           <p className='text-sm'>{msg.text}</p>
@@ -601,13 +602,13 @@ export default function Chatbox() {
               <input
                 type='text'
                 placeholder='Aa'
-                className='flex-1 px-4 py-2 rounded-full bg-[#2A2A2A] text-white outline-none'
+                className='flex-1 px-4 py-2 rounded-full border border-black text-black outline-none'
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               />
               <button
-                className='ml-2 text-blue-500 hover:text-blue-400 disabled:text-gray-500'
+                className='ml-2 text-black hover:text-gray-400 disabled:text-gray-500'
                 onClick={handleSend}
                 disabled={!input.trim() || !selectedUser || !socket || !isConnected}
               >
