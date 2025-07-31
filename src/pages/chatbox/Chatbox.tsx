@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { SearchAllUser, GetAllMessage } from '../../apis/user.api'
 import { io, Socket } from 'socket.io-client'
 import { Mic } from 'lucide-react'
-import { v4 as uuidv4 } from 'uuid'
 
 type Message = {
   id: number | string
@@ -16,12 +13,37 @@ type Message = {
   messageType: 'text' | 'voice'
 }
 
+type User = {
+  id: string
+  username: string
+  name: string
+  online: boolean
+  avatar: string
+  message?: string // Thêm thuộc tính message
+  time?: string // Thêm thuộc tính time
+}
+
+type MessageData = {
+  _id: string
+  senderId: string
+  createdAt: string
+  content: string
+  audioUrl?: string
+  type: 'text' | 'voice'
+  roomId?: string // Thêm thuộc tính roomId
+}
+
+type ApiUser = {
+  _id: string
+  username: string
+}
+
 export default function Chatbox() {
-  const [selectedUser, setSelectedUser] = useState<any | null>(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [socket, setSocket] = useState<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
@@ -36,9 +58,9 @@ export default function Chatbox() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
-  const currentAudioIdRef = useRef<string | null>(null)
   const audioStreamRef = useRef<MediaStream | null>(null)
   const receivedAudioChunksRef = useRef<Map<string, ArrayBuffer[]>>(new Map())
+  const wsRef = useRef<WebSocket | null>(null)
 
   const currentUserId = localStorage.getItem('user_id')
 
@@ -152,7 +174,7 @@ export default function Chatbox() {
 
     socket.on('receiveAudioChunk', handleReceiveAudioChunk)
 
-    const handleReceiveMessage = (message: any) => {
+    const handleReceiveMessage = (message: MessageData) => {
       console.log('Received new message:', message)
 
       if (currentRoom && message.roomId === currentRoom) {
@@ -167,13 +189,13 @@ export default function Chatbox() {
             id: message._id || Date.now(),
             sender: message.senderId === currentUserId ? 'Bạn' : selectedUser?.name || 'Unknown',
             senderId: message.senderId,
-            time: new Date(message.timestamp).toLocaleTimeString([], {
+            time: new Date(message.createdAt).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit'
             }),
             text: message.content || '',
             audioUrl: message.audioUrl,
-            messageType: message.messageType
+            messageType: message.type
           }
 
           console.log('Adding new message:', newMessage)
@@ -235,119 +257,6 @@ export default function Chatbox() {
     }, 1000)
   }
 
-  const handleSendAudio = async () => {
-    if (!navigator.mediaDevices || !window.MediaRecorder) {
-      alert('Trình duyệt không hỗ trợ ghi âm.')
-      return
-    }
-
-    if (!socket || !currentRoom || !selectedUser || !currentUserId) {
-      alert('Vui lòng chọn người nhận trước khi ghi âm.')
-      return
-    }
-
-    if (!isRecording) {
-      try {
-        // Start recording
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            sampleRate: 44100
-          }
-        })
-
-        audioStreamRef.current = stream
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'audio/webm;codecs=opus'
-        })
-        mediaRecorderRef.current = mediaRecorder
-
-        const audioId = uuidv4()
-        currentAudioIdRef.current = audioId
-
-        console.log('Starting recording with audioId:', audioId)
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            console.log('Data available, size:', event.data.size)
-
-            event.data
-              .arrayBuffer()
-              .then((buffer) => {
-                socket.emit('sendAudioChunk', {
-                  chunk: buffer,
-                  roomId: currentRoom,
-                  senderId: currentUserId,
-                  receiverId: selectedUser.id,
-                  timestamp: new Date().toISOString(),
-                  audioId,
-                  isFinal: false
-                })
-              })
-              .catch((error) => {
-                console.error('Error converting to ArrayBuffer:', error)
-              })
-          }
-        }
-
-        mediaRecorder.onstop = () => {
-          console.log('Recording stopped')
-
-          // Stop all tracks
-          if (audioStreamRef.current) {
-            audioStreamRef.current.getTracks().forEach((track) => track.stop())
-            audioStreamRef.current = null
-          }
-
-          setIsRecording(false)
-          setRecordingTime(0)
-
-          if (recordingTimerRef.current) {
-            clearInterval(recordingTimerRef.current)
-          }
-
-          // Send final signal
-          if (currentAudioIdRef.current) {
-            socket.emit('sendAudioChunk', {
-              chunk: new ArrayBuffer(0), // Empty buffer as final signal
-              roomId: currentRoom,
-              senderId: currentUserId,
-              receiverId: selectedUser.id,
-              timestamp: new Date().toISOString(),
-              audioId: currentAudioIdRef.current,
-              isFinal: true
-            })
-          }
-        }
-
-        mediaRecorder.onerror = (error) => {
-          console.error('MediaRecorder error:', error)
-          setIsRecording(false)
-          setRecordingTime(0)
-        }
-
-        // Start recording with time slice
-        mediaRecorder.start(1000) // Send chunk every 1 second
-        setIsRecording(true)
-        setRecordingTime(0)
-
-        // Timer for recording duration
-        recordingTimerRef.current = setInterval(() => {
-          setRecordingTime((prev) => prev + 1)
-        }, 1000)
-      } catch (error) {
-        console.error('Không thể ghi âm:', error)
-        alert('Không thể truy cập microphone. Vui lòng cho phép quyền truy cập.')
-      }
-    } else {
-      // Stop recording
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop()
-      }
-    }
-  }
-
   const handleSend = useCallback(() => {
     if (!input.trim() || !selectedUser || !socket || !currentUserId || !currentRoom) {
       return
@@ -367,7 +276,7 @@ export default function Chatbox() {
     socket.emit('stopTyping', { roomId: currentRoom, userId: currentUserId })
   }, [input, selectedUser, socket, currentUserId, currentRoom])
 
-  const handleSelectUser = async (user: any) => {
+  const handleSelectUser = async (user: User) => {
     if (!socket || !currentUserId) return
 
     setIsTyping(false)
@@ -387,8 +296,8 @@ export default function Chatbox() {
       const messages = response.data?.users && Array.isArray(response.data.users) ? response.data.users : []
 
       const formattedMessages = messages
-        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        .map((msg: any) => ({
+        .sort((a: MessageData, b: MessageData) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        .map((msg: MessageData) => ({
           id: msg._id,
           sender: msg.senderId === currentUserId ? 'Bạn' : user.name,
           senderId: msg.senderId,
@@ -428,18 +337,23 @@ export default function Chatbox() {
 
     try {
       const allUsers = await SearchAllUser()
-      const filteredUsers = allUsers.data.user.users.filter(
-        (user: any) => user.username.toLowerCase().includes(keyword.toLowerCase()) && user._id !== currentUserId
-      )
-
-      const mappedUsers = filteredUsers.map((user: any) => ({
+      const usersFromApi: User[] = allUsers.data.user.users.map((user: ApiUser) => ({
         id: user._id,
+        username: user.username,
         name: user.username,
-        message: 'Bấm để bắt đầu trò chuyện',
-        time: 'now',
-        online: onlineUserIds.includes(user._id),
+        online: false, // Giá trị mặc định nếu không có từ API
         avatar: `https://i.pravatar.cc/50?u=${user._id}`
       }))
+
+      const filteredUsers: User[] = usersFromApi.filter((user) => user.id !== currentUserId)
+
+      const mappedUsers: User[] = filteredUsers.map((user) => ({
+        ...user,
+        message: 'Bấm để bắt đầu trò chuyện',
+        time: 'now',
+        online: onlineUserIds.includes(user.id)
+      }))
+
       setUsers(mappedUsers)
     } catch (error) {
       console.error('Lỗi tìm kiếm user:', error)
@@ -450,9 +364,9 @@ export default function Chatbox() {
     const fetchUsers = async () => {
       try {
         const allUsers = await SearchAllUser()
-        const filteredUsers = allUsers.data.user.users.filter((user: any) => user._id !== currentUserId)
+        const filteredUsers = allUsers.data.user.users.filter((user: ApiUser) => user._id !== currentUserId)
 
-        const mappedUsers = filteredUsers.map((user: any) => ({
+        const mappedUsers = filteredUsers.map((user: ApiUser) => ({
           id: user._id,
           name: user.username,
           message: 'Bấm để bắt đầu trò chuyện',
@@ -473,24 +387,240 @@ export default function Chatbox() {
 
   // Cleanup on unmount
   useEffect(() => {
+    // Store refs in variables at effect creation time
+    const typingTimeout = typingTimeoutRef.current
+    const audioStream = audioStreamRef.current
+    const recordingTimer = recordingTimerRef.current
+    const audioContext = audioContextRef.current
+    const websocket = wsRef.current
+    const mediaRecorder = mediaRecorderRef.current
+
     return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current)
+      if (typingTimeout) {
+        clearTimeout(typingTimeout)
       }
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop()
+
+      // Stop MediaRecorder if it exists (fallback)
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop()
       }
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach((track) => track.stop())
+
+      // Stop Web Audio processing
+      if (audioContext) {
+        const audioContextWithProcessor = audioContext as AudioContext & { processor?: ScriptProcessorNode }
+        if (audioContextWithProcessor.processor) {
+          audioContextWithProcessor.processor.disconnect()
+          delete audioContextWithProcessor.processor
+        }
+        audioContext.close()
       }
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current)
+
+      if (audioStream) {
+        audioStream.getTracks().forEach((track) => track.stop())
       }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
+      if (recordingTimer) {
+        clearInterval(recordingTimer)
+      }
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.close()
       }
     }
   }, [])
+
+  const handleRealTimeAudio = async () => {
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      alert('Trình duyệt không hỗ trợ ghi âm.')
+      return
+    }
+
+    if (!socket || !currentRoom || !selectedUser || !currentUserId) {
+      alert('Vui lòng chọn người nhận trước khi ghi âm.')
+      return
+    }
+
+    if (!isRecording) {
+      try {
+        // Start WebSocket connection
+        const ws = new WebSocket('ws://127.0.0.1:8000/ws/real-time-transcribe/')
+        wsRef.current = ws
+
+        ws.onopen = () => {
+          console.log('[CLIENT] WebSocket connection established')
+        }
+
+        ws.onmessage = (event) => {
+          console.log('[CLIENT] Real-time transcription:', event.data)
+
+          // Hiển thị transcription trong chat
+          const messageData: Message = {
+            id: Date.now(),
+            sender: 'Bạn',
+            senderId: currentUserId,
+            time: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            text: event.data,
+            audioUrl: undefined,
+            messageType: 'text'
+          }
+
+          setMessages((prev) => [...prev, messageData])
+        }
+
+        ws.onerror = (error) => {
+          console.error('[CLIENT] WebSocket error:', error)
+          // Stop recording if WebSocket fails
+          if (isRecording) {
+            setIsRecording(false)
+            setRecordingTime(0)
+          }
+        }
+
+        ws.onclose = (event) => {
+          console.log('[CLIENT] WebSocket connection closed:', event.code, event.reason)
+          wsRef.current = null
+        }
+
+        // Start audio recording
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 16000 // Set to match the server config
+          }
+        })
+
+        const audioContext = new AudioContext({ sampleRate: 16000 })
+        audioContextRef.current = audioContext
+        audioStreamRef.current = stream
+
+        console.log('Starting real-time recording with Web Audio API')
+
+        let chunkCounter = 0
+        const CHUNK_SIZE = 16000 // ~1 seconds at 16kHz
+
+        // Use Web Audio API for direct PCM capture
+        const source = audioContext.createMediaStreamSource(stream)
+        const processor = audioContext.createScriptProcessor(4096, 1, 1)
+
+        let audioBuffer: Float32Array[] = []
+        let bufferSampleCount = 0
+
+        processor.onaudioprocess = (event) => {
+          // Check if WebSocket is still valid and open
+          if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.log('WebSocket not available, skipping audio processing')
+            return
+          }
+
+          const inputBuffer = event.inputBuffer
+          const inputData = inputBuffer.getChannelData(0)
+
+          // Copy input data to our buffer
+          const chunk = new Float32Array(inputData.length)
+          chunk.set(inputData)
+          audioBuffer.push(chunk)
+          bufferSampleCount += inputData.length
+
+          // When we have enough samples, send a chunk
+          if (bufferSampleCount >= CHUNK_SIZE) {
+            chunkCounter++
+
+            // Combine buffer chunks into single array
+            const combinedBuffer = new Float32Array(bufferSampleCount)
+            let offset = 0
+            for (const bufferChunk of audioBuffer) {
+              combinedBuffer.set(bufferChunk, offset)
+              offset += bufferChunk.length
+            }
+
+            // Double-check WebSocket before sending
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              // Send PCM data
+              const pcmBuffer = combinedBuffer.buffer
+              wsRef.current.send(pcmBuffer)
+              console.log(`[CLIENT] Sent PCM chunk #${chunkCounter} to server:`, bufferSampleCount, 'samples')
+            } else {
+              console.log('WebSocket closed, stopping audio processing')
+              return
+            }
+
+            // Reset buffer
+            audioBuffer = []
+            bufferSampleCount = 0
+          }
+        }
+
+        // Connect audio nodes
+        source.connect(processor)
+        processor.connect(audioContext.destination)
+
+        // Store processor reference for cleanup
+        audioContextRef.current = audioContext
+        // Store processor for cleanup (we'll handle this in stop logic)
+        const audioContextWithProcessor = audioContextRef.current as AudioContext & { processor?: ScriptProcessorNode }
+        audioContextWithProcessor.processor = processor
+        setIsRecording(true)
+        setRecordingTime(0)
+
+        // Timer for recording duration
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime((prev) => prev + 1)
+        }, 1000)
+      } catch (error) {
+        console.error('Error starting recording:', error)
+        alert('Không thể bắt đầu ghi âm. Hãy thử lại.')
+      }
+    } else {
+      // Stop recording - Web Audio API version
+      console.log('Stopping real-time recording')
+
+      // Update UI state first to prevent further interactions
+      setIsRecording(false)
+      setRecordingTime(0)
+
+      // Close WebSocket first to stop accepting new data
+      if (wsRef.current) {
+        console.log('WebSocket state before close:', wsRef.current.readyState)
+        if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+          console.log('Closing WebSocket connection')
+          wsRef.current.close()
+        }
+        wsRef.current = null
+        console.log('WebSocket reference cleared')
+      }
+
+      // Stop Web Audio processing
+      if (audioContextRef.current) {
+        const audioContextWithProcessor = audioContextRef.current as AudioContext & { processor?: ScriptProcessorNode }
+        if (audioContextWithProcessor.processor) {
+          console.log('Disconnecting audio processor')
+          audioContextWithProcessor.processor.disconnect()
+          delete audioContextWithProcessor.processor
+        }
+      }
+
+      // Stop audio stream
+      if (audioStreamRef.current) {
+        console.log('Stopping audio tracks')
+        audioStreamRef.current.getTracks().forEach((track) => {
+          track.stop()
+          console.log('Stopped track:', track.kind)
+        })
+        audioStreamRef.current = null
+      }
+
+      // Clear timer
+      if (recordingTimerRef.current) {
+        console.log('Clearing recording timer')
+        clearInterval(recordingTimerRef.current)
+        recordingTimerRef.current = null
+      }
+
+      console.log('Recording stopped successfully')
+    }
+  }
 
   return (
     <div className='h-screen w-screen flex text-white font-sans'>
@@ -591,7 +721,7 @@ export default function Chatbox() {
             <div className='p-3 border-t border-[#333] flex items-center'>
               <button
                 className={`text-gray-400 hover:text-white mr-2 ${isRecording ? 'text-red-500 animate-pulse' : ''}`}
-                onClick={handleSendAudio}
+                onClick={handleRealTimeAudio}
                 disabled={!selectedUser || !socket || !isConnected}
                 title={isRecording ? 'Dừng ghi âm' : 'Ghi âm'}
               >
